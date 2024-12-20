@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from github import Github
 from github.PullRequest import PullRequest
 from github.Repository import Repository
@@ -35,7 +35,7 @@ class GithubService:
         self.client = Github(github_token) if github_token else Github()
 
     
-    def _parse_repo_url(self, repo_url: str) -> tuple[str, str]:
+    def _parse_repo_url(self, repo_url: str) -> Tuple[str, str]:
         path = urlparse(repo_url).path.strip("/")
         parts = path.split("/")
         if len(parts) < 2:
@@ -43,7 +43,12 @@ class GithubService:
 
         return parts[0], parts[1]
 
+
+    def get_default_branch(self, repo_url: str) -> str:
+        repo = self._get_repo(repo_url=repo_url)
+        return repo.default_branch
  
+    
     def _get_repo(self, repo_url: str) -> Repository:
         owner, repo_name = self._parse_repo_url(repo_url=repo_url)
         return self.client.get_repo(f"{owner}/{repo_name}")
@@ -144,21 +149,68 @@ class GithubService:
             return None
 
 
-    def retrieve_github_repo_all_content(self, repo_url: str):
-        """
-        Retrieves and formats repository information, including README, the directory tree,
-        and file contents, while ignoring the .github folder.
-        """
+    def get_github_repo_complete_data(self, repo_url: str) -> List[dict]:
         directory_tree, file_paths = self.get_tree_strucutre_and_file_paths(repo_url=repo_url)
 
-        formatted_string = f"Directory Structure:\n{directory_tree}\n"
+        contents = []
 
         for path in file_paths:
-            # file_info = self._get_repo_content(repo_url=repo_url, path=path)
-            file_content = self.get_file_content(repo_url=repo_url, file_path=path, ref= "main")
-            formatted_string += '\n' + f"{path}:\n" + '```\n' + file_content + '\n' + '```\n'
+            branch = self.get_default_branch(repo_url=repo_url)
+            file_content = self.get_file_content(repo_url=repo_url, file_path=path, ref= branch)
+            filetype = ""
 
-        return formatted_string
+            if ("." in path):
+                filetype = path.split(".")[-1]
+
+            contents.append({
+                "filename": path,
+                "filetype": filetype,
+                "content": file_content
+            })
+
+        return directory_tree, file_paths, contents
+
+    def get_diff_sections(self, repo_url: str, pr_number: int) -> List[str]:
+        try:
+            pr_details = self.get_pr_details(repo_url=repo_url, pr_number=pr_number)
+            return [file.patch for file in pr_details.files if file.patch]
+        except Exception as e:
+            raise Exception(f"Error fetching diff sections: {e}")
+
+    
+    def get_commit_history(self, repo_url: str, branch: Optional[str] = None) -> List[dict]:
+        try:
+            repo = self._get_repo(repo_url=repo_url)
+            branch = branch or repo.default_branch
+            commits = repo.get_commits(sha=branch)
+            return [
+                {
+                    "sha": commit.sha,
+                    "author": commit.commit.author.name,
+                    "message": commit.commit.message,
+                    "date": commit.commit.author.date.isoformat(),
+                }
+                for commit in commits
+            ]
+        except Exception as e:
+            raise Exception(f"Error fetching commit history: {e}")
+
+    
+    def get_pr_statistics(self, repo_url: str, pr_number: int) -> dict:
+        try:
+            pr_details = self.get_pr_details(repo_url=repo_url, pr_number=pr_number)
+            total_additions = sum(file.additions for file in pr_details.files)
+            total_deletions = sum(file.deletions for file in pr_details.files)
+            total_changes = sum(file.changes for file in pr_details.files)
+            return {
+                "total_files": len(pr_details.files),
+                "total_additions": total_additions,
+                "total_deletions": total_deletions,
+                "total_changes": total_changes,
+            }
+        except Exception as e:
+            raise Exception(f"Error fetching PR statistics: {e}")
+
 
 # if __name__ == "__main__":
 

@@ -12,5 +12,5 @@ async def root():
 
 # Initialize database
 @app.on_event("startup")
-async def startup_event():
-    await init_db()
+def startup_event():
+    init_db()

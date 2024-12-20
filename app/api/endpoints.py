@@ -4,6 +4,7 @@ from app.db.crud import save_analysis, get_analysis_by_id
 from uuid import uuid4
 from app.services import GithubService
 from app.config import get_github_service
+from app.services import CodeReviewAgent
 
 router = APIRouter()
 
@@ -22,6 +23,7 @@ async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = 
                 "title": pr_details.title,
                 "description": pr_details.description,
                 "state": pr_details.state,
+                "diff": pr_details.diff,
                 "files": [
                     {
                         "filename": file.filename,
@@ -36,6 +38,10 @@ async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = 
                 "total_files": len(pr_details.files)
             }
         })
+
+        agent = CodeReviewAgent(repo_url=str(payload.repo_url), github_service=github_service)
+        repo_context = agent.setup_repo_context()
+        print(repo_context)
     
     except Exception as e:
         raise Exception(f"Error occured in post request fetching pr details url: {payload.repo_url}, pr_num: {payload.pr_number}")
@@ -73,7 +79,7 @@ async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = 
     }
 
     # Ṣave analysis to db
-    await save_analysis(task_id, str(payload.repo_url), analysis_result)
+    # await save_analysis(task_id, str(payload.repo_url), analysis_result)
 
     return {'task_id': task_id}
 

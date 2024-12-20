@@ -39,6 +39,11 @@ class Settings(BaseSettings):
         description="PostgreSQL database URL"
     )
 
+    GEMINI_API_KEY: str = Field(
+        default=...,
+        description="Gemine api key"
+    )
+
     @validator("DATABASE_URL", pre=True)
     def validate_database_url(cls, v):
         if os.getenv("DATABASE_URL"):
