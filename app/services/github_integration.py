@@ -26,6 +26,7 @@ class PRDetails:
     state: str
     files: List[PRFile]
     diff: str
+    head_sha: str
 
 
 class GithubService:
@@ -129,7 +130,8 @@ class GithubService:
                 description=pr.body or "",
                 state=pr.state,
                 files=files,
-                diff=pr.diff_url
+                diff=pr.diff_url,
+                head_sha=pr.head.sha
             )
 
         except Exception as e:

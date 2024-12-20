@@ -14,6 +14,8 @@ from langchain_text_splitters import (
 from langchain_chroma import Chroma
 import chromadb
 import google.generativeai as genai
+import requests
+from app.services.github_integration import PRDetails
 
 @dataclass
 class RepoContext:
@@ -22,12 +24,6 @@ class RepoContext:
     tree_structure: str
     file_contents: List[Dict]
 
-@dataclass
-class PRDetails:
-    files_changed: List[str]
-    diff_content: Dict[str, str]
-    additions: int
-    deletions: int
 
 class CodeReviewAgent:
     def __init__(self, repo_url: str, github_service: GithubService):
@@ -111,136 +107,58 @@ class CodeReviewAgent:
         print(repo_context)
 
         return repo_context
-    
-    def get_pr_details(self, pr_branch: str, base_branch: str = "main") -> PRDetails:
-        """Extract information about changes in the PR"""
-        # Get diff between branches
-        diff_index = repo.commit(base_branch).diff(repo.commit(pr_branch))
+
+
+    def review_changes(self, pr_details: PRDetails) -> str:
+        """Review code changes using the LLM"""
+        review_template = """
+            You are an expert code reviewer. Please review the following code changes:
+
+                Context:
+                Files changed: {files_changed}
+
+                Changes:
+                {diff_content}
+
+                Consider:
+                1. Code quality and adherence to best practices
+                2. Potential bugs or edge cases
+                3. Performance optimizations
+                4. Readability and maintainability
+                5. Any security concerns
+
+                Provide a detailed review with specific suggestions for improvements. Format your response as:
+                - Summary of changes
+                - Key concerns (if any)
+                - Specific recommendations
+                - Positive aspects
+        """
         
-        files_changed = []
-        diff_content = {}
-        additions = 0
-        deletions = 0
+        prompt = ChatPromptTemplate.from_template(review_template)
         
-        for diff_item in diff_index:
-            file_path = diff_item.a_path
-            files_changed.append(file_path)
-            diff_content[file_path] = diff_item.diff.decode('utf-8')
-            
-            # Count additions and deletions
-            for line in diff_content[file_path].split('\n'):
-                if line.startswith('+') and not line.startswith('+++'):
-                    additions += 1
-                elif line.startswith('-') and not line.startswith('---'):
-                    deletions += 1
+        # Get relevant context from vector store
+        relevant_docs = []
+        for file in pr_details.files:
+            results = self.vector_store.similarity_search(
+                file.filename,
+                k=2,
+                filter={"type": "content"}
+            )
+            relevant_docs.extend(results)
         
-        return PRDetails(
-            files_changed=files_changed,
-            diff_content=diff_content,
-            additions=additions,
-            deletions=deletions
+        # Combine diff content
+        diff_text = "\n".join([
+            f"=== {file.filename} ===\n{file.content}\n"
+            for file in pr_details.files
+        ])
+        
+        # Generate review
+        review = self.llm.predict(
+            prompt.format(
+                files_changed=", ".join([file.filename for file in pr_details.files]),
+                diff_content=diff_text
+            )
         )
-    
-#     def review_changes(self, pr_details: PRDetails) -> str:
-#         """Review code changes using the LLM"""
-#         review_template = """You are an expert code reviewer. Please review the following code changes:
-
-# Context:
-# Files changed: {files_changed}
-# Total additions: {additions}
-# Total deletions: {deletions}
-
-# Changes:
-# {diff_content}
-
-# Consider:
-# 1. Code quality and adherence to best practices
-# 2. Potential bugs or edge cases
-# 3. Performance optimizations
-# 4. Readability and maintainability
-# 5. Any security concerns
-
-# Provide a detailed review with specific suggestions for improvements. Format your response as:
-# - Summary of changes
-# - Key concerns (if any)
-# - Specific recommendations
-# - Positive aspects
-# """
         
-#         prompt = ChatPromptTemplate.from_template(review_template)
-        
-#         # Get relevant context from vector store
-#         relevant_docs = []
-#         for file in pr_details.files_changed:
-#             results = self.vector_store.similarity_search(
-#                 file,
-#                 k=2,
-#                 filter={"type": "content"}
-#             )
-#             relevant_docs.extend(results)
-        
-#         # Combine diff content
-#         diff_text = "\n".join([
-#             f"=== {file} ===\n{content}\n"
-#             for file, content in pr_details.diff_content.items()
-#         ])
-        
-#         # Generate review
-#         review = self.llm.predict(
-#             prompt.format(
-#                 files_changed=", ".join(pr_details.files_changed),
-#                 additions=pr_details.additions,
-#                 deletions=pr_details.deletions,
-#                 diff_content=diff_text
-#             )
-#         )
-        
-#         return review
-
-# def create_review_workflow() -> Graph:
-#     """Create a LangGraph workflow for the code review process"""
-#     workflow = StateGraph(GraphStore())
-    
-#     # Define nodes
-#     workflow.add_node("setup_context", lambda x: x["agent"].setup_repo_context())
-#     workflow.add_node("get_pr_details", lambda x: x["agent"].get_pr_details(x["pr_branch"]))
-#     workflow.add_node("review_code", lambda x: x["agent"].review_changes(x["pr_details"]))
-    
-#     # Define edges
-#     workflow.add_edge("setup_context", "get_pr_details")
-#     workflow.add_edge("get_pr_details", "review_code")
-    
-#     return workflow
-
-# Example usage
-# if __name__ == "__main__":
-#     # Initialize agent
-#     # Github(github_token)
-#     client = Github("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")
-#     repo_url = "https://github.com/krish-patel1003/RMS"
-#     agent = CodeReviewAgent(repo_url=repo_url, github_service=client)
-#     agent.setup_repo_context(repo_url=repo_url)
-
-    
-    # # Create workflow
-    # workflow = create_review_workflow()
-    
-    # # Run review
-    # result = workflow.run({
-    #     "agent": agent,
-    #     "pr_branch": "feature-branch"
-    # })
-    
-    # print(result["review_code"])
-"""
-Please review the following code:
-[paste your code]
-Consider:
-1. Code quality and adherence to best practices
-2. Potential bugs or edge cases
-3. Performance optimizations
-4. Readability and maintainability
-5. Any security concerns
-Suggest improvements and explain your reasoning for each suggestion.
-"""
+        return review
 

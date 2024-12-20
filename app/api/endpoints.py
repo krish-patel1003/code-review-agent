@@ -42,6 +42,9 @@ async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = 
         agent = CodeReviewAgent(repo_url=str(payload.repo_url), github_service=github_service)
         repo_context = agent.setup_repo_context()
         print(repo_context)
+
+        review = agent.review_changes(pr_details=pr_details)
+        print(review)
     
     except Exception as e:
         raise Exception(f"Error occured in post request fetching pr details url: {payload.repo_url}, pr_num: {payload.pr_number}")
