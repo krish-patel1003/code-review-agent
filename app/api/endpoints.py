@@ -3,13 +3,16 @@ from app.models.request_models import AnalyzePRRequest
 from app.db.crud import save_analysis, get_analysis_by_id
 from uuid import uuid4
 from app.services import GithubService
-from app.config import get_github_service
+from app.config import get_github_service, get_code_review_agent
 from app.services import CodeReviewAgent
 
 router = APIRouter()
 
 @router.post("/analyze-pr")
-async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = Depends(get_github_service)):
+async def analyze_pr(
+    payload: AnalyzePRRequest, 
+    github_service: GithubService = Depends(get_github_service), 
+    agent: CodeReviewAgent = Depends(get_code_review_agent)):
 
     try:
         pr_details = github_service.get_pr_details(
@@ -17,34 +20,13 @@ async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = 
             payload.pr_number
         )
 
-        print({
-            "status": "success",
-            "data": {
-                "title": pr_details.title,
-                "description": pr_details.description,
-                "state": pr_details.state,
-                "diff": pr_details.diff,
-                "files": [
-                    {
-                        "filename": file.filename,
-                        "status": file.status,
-                        "additions": file.additions,
-                        "deletions": file.deletions,
-                        "changes": file.changes,
-                        "content": file.content
-                    }
-                    for file in pr_details.files
-                ],
-                "total_files": len(pr_details.files)
-            }
-        })
-
-        agent = CodeReviewAgent(repo_url=str(payload.repo_url), github_service=github_service)
-        repo_context = agent.setup_repo_context()
-        print(repo_context)
+        repo_context = agent.setup_repo_context(repo_url=str(payload.repo_url))
 
         review = agent.review_changes(pr_details=pr_details)
+
         print(review)
+
+        print("working so far so good")
     
     except Exception as e:
         raise Exception(f"Error occured in post request fetching pr details url: {payload.repo_url}, pr_num: {payload.pr_number}")

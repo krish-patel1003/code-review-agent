@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict, Annotated
 from pathlib import Path
 import os
 from dataclasses import dataclass
@@ -26,12 +26,10 @@ class RepoContext:
 
 
 class CodeReviewAgent:
-    def __init__(self, repo_url: str, github_service: GithubService):
+    def __init__(self, github_service: GithubService, api_key: str):
         self.github_client= github_service
-        self.repo_url = repo_url
         try:
             # Configure Gemini
-            api_key = os.getenv("GEMINI_API_KEY", "AIzaSyCDL8mcL3MZdO1ikRbogJ1wTeBeaBLFhAQ")
             genai.configure(api_key=api_key)
             
             # Initialize LLM
@@ -68,11 +66,11 @@ class CodeReviewAgent:
             chunk_overlap=200
         )
         
-    def setup_repo_context(self) -> RepoContext:
+    def setup_repo_context(self, repo_url: str) -> RepoContext:
         """Initialize repository context and store in vector database"""       
         # Get repository structure      
 
-        tree_structure, file_paths, file_contents = self.github_client.get_github_repo_complete_data(repo_url=self.repo_url)
+        tree_structure, file_paths, file_contents = self.github_client.get_github_repo_complete_data(repo_url=repo_url)
         
         # Store in vector database
         texts = []
@@ -84,8 +82,7 @@ class CodeReviewAgent:
             metadatas.extend([{"file": file["filename"], "filetype": file["filetype"], "type": "content"}] * len(chunks))
         
         # Add repository structure
-        tree_text = "\n".join(tree_structure)
-        texts.append(tree_text)
+        texts.append(tree_structure)
         metadatas.append({"type": "structure"})
         
         # Create or get vector store
@@ -98,9 +95,9 @@ class CodeReviewAgent:
         self.vector_store.add_texts(texts=texts, metadatas=metadatas)
 
         repo_context = RepoContext(
-            repo_url=self.repo_url,
+            repo_url=repo_url,
             files=file_paths,
-            tree_structure="\n".join(tree_structure),
+            tree_structure=tree_structure,
             file_contents=file_contents
         )
         
@@ -108,31 +105,38 @@ class CodeReviewAgent:
 
         return repo_context
 
+    
+    def get_pr_details(self, repo_url: str) -> PRDetails:
+        return self.github_client.get_pr_details
 
     def review_changes(self, pr_details: PRDetails) -> str:
         """Review code changes using the LLM"""
         review_template = """
-            You are an expert code reviewer. Please review the following code changes:
+You are an expert code reviewer. Please review the following code changes:
 
-                Context:
-                Files changed: {files_changed}
+Context:
+Files changed: {files_changed}
 
-                Changes:
-                {diff_content}
+Changes:
+{diff_content}
 
-                Consider:
-                1. Code quality and adherence to best practices
-                2. Potential bugs or edge cases
-                3. Performance optimizations
-                4. Readability and maintainability
-                5. Any security concerns
+Consider:
+1. Code quality and adherence to best practices
+2. Potential bugs or edge cases
+3. Performance optimizations
+4. Readability and maintainability
+5. Any security concerns
 
-                Provide a detailed review with specific suggestions for improvements. Format your response as:
-                - Summary of changes
-                - Key concerns (if any)
-                - Specific recommendations
-                - Positive aspects
-        """
+Provide a detailed review with specific suggestions for improvements. Format your response as
+a json with an object files that has list of files that has issues, each sub object in it should have these attributes:
+filename,
+issue_type,
+line_number_of_issue,
+issue_description,
+suggestions
+
+and at last last object in the json should be a summary of having attributes total_files_changed, total_issues, and critical_issues
+"""
         
         prompt = ChatPromptTemplate.from_template(review_template)
         
@@ -152,13 +156,19 @@ class CodeReviewAgent:
             for file in pr_details.files
         ])
         
+        files_changed = ", ".join([file.filename for file in pr_details.files])
+
+        # print(files_changed)
+        # print(diff_text)
+
+        final_prompt = prompt.invoke({
+                "files_changed":files_changed,
+                "diff_content":diff_text
+            })
+
+        print("prompt:\n", final_prompt)
+
         # Generate review
-        review = self.llm.predict(
-            prompt.format(
-                files_changed=", ".join([file.filename for file in pr_details.files]),
-                diff_content=diff_text
-            )
-        )
+        review = self.llm.invoke(final_prompt)
         
         return review
-
