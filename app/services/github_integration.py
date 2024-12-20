@@ -49,9 +49,9 @@ class GithubService:
         return self.client.get_repo(f"{owner}/{repo_name}")
 
 
-    def _get_repo_content(self, repo_url: str):
+    def _get_repo_content(self, repo_url: str, path: str = ""):
         repo = self._get_repo(repo_url=repo_url)
-        contents = repo.get_contents("")
+        contents = repo.get_contents(path)
         return contents
 
     def _build_tree_structure(
@@ -134,7 +134,7 @@ class GithubService:
     def get_file_content(self, repo_url: str, file_path: str, ref: str) -> Optional[str]:
 
         try:
-            repo = self._get_repository(repo_url)
+            repo = self._get_repo(repo_url)
             content_file = repo.get_contents(file_path, ref=ref)
             if isinstance(content_file, (list, tuple)):
                 return None
@@ -144,10 +144,27 @@ class GithubService:
             return None
 
 
+    def retrieve_github_repo_all_content(self, repo_url: str):
+        """
+        Retrieves and formats repository information, including README, the directory tree,
+        and file contents, while ignoring the .github folder.
+        """
+        directory_tree, file_paths = self.get_tree_strucutre_and_file_paths(repo_url=repo_url)
+
+        formatted_string = f"Directory Structure:\n{directory_tree}\n"
+
+        for path in file_paths:
+            # file_info = self._get_repo_content(repo_url=repo_url, path=path)
+            file_content = self.get_file_content(repo_url=repo_url, file_path=path, ref= "main")
+            formatted_string += '\n' + f"{path}:\n" + '```\n' + file_content + '\n' + '```\n'
+
+        return formatted_string
+
 # if __name__ == "__main__":
 
+#     repo_url = "https://github.com/krish-patel1003/RMS"
 #     client = GithubService("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")
-#     tree, file_paths = client.get_tree_strucutre_and_file_paths(repo_url="https://github.com/krish-patel1003/RMS")
-
-#     print("tree:\n", tree)
-#     print("file_paths:\n", file_paths)
+#     tree, file_paths = client.get_tree_strucutre_and_file_paths(repo_url=repo_url)
+#     print(file_paths)
+#     result = client.retrieve_github_repo_all_content(repo_url=repo_url)
+#     print(result)
