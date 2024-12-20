@@ -1,12 +1,44 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from app.models.request_models import AnalyzePRRequest
 from app.db.crud import save_analysis, get_analysis_by_id
 from uuid import uuid4
+from app.services import GithubService
+from app.config import get_github_service
 
 router = APIRouter()
 
 @router.post("/analyze-pr")
-async def analyze_pr(payload: AnalyzePRRequest):
+async def analyze_pr(payload: AnalyzePRRequest, github_service: GithubService = Depends(get_github_service)):
+
+    try:
+        pr_details = github_service.get_pr_details(
+            str(payload.repo_url),
+            payload.pr_number
+        )
+
+        print({
+            "status": "success",
+            "data": {
+                "title": pr_details.title,
+                "description": pr_details.description,
+                "state": pr_details.state,
+                "files": [
+                    {
+                        "filename": file.filename,
+                        "status": file.status,
+                        "additions": file.additions,
+                        "deletions": file.deletions,
+                        "changes": file.changes,
+                        "content": file.content
+                    }
+                    for file in pr_details.files
+                ],
+                "total_files": len(pr_details.files)
+            }
+        })
+    
+    except Exception as e:
+        raise Exception(f"Error occured in post request fetching pr details url: {payload.repo_url}, pr_num: {payload.pr_number}")
 
     task_id = str(uuid4())
 

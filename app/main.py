@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.api.endpoints import router
 from app.db.database import init_db
 
-app = FastAPI(title="Code Review Agent", version="1.0.0")
+app = FastAPI()
 
 app.include_router(router)
 
