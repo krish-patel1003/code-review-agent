@@ -95,8 +95,6 @@ class GithubService:
     
     def get_pr_details(self, repo_url: str, pr_number: int) -> PRDetails:
 
-        tree_str, file_paths = self.get_tree_strucutre_and_file_paths(repo_url=repo_url)
-
         try:
             repo = self._get_repo(repo_url=repo_url)
             pr: PullRequest = repo.get_pull(number=pr_number)

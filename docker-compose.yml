@@ -1,5 +1,4 @@
-name: code-review-agent
-
+version: "3.9"
 services:
   web:
     build:
@@ -12,7 +11,24 @@ services:
     volumes:
       - .:/app
     depends_on:
+      - redis
       - db
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A app.tasks.analyze worker --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - db
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
 
   db:
     image: postgres:13

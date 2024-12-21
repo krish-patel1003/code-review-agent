@@ -44,6 +44,16 @@ class Settings(BaseSettings):
         description="Gemine api key"
     )
 
+    CELERY_BROKER_URL: str = Field(
+        default=...,
+        description="Celery broker url"
+    )
+
+    CELERY_RESULT_BACKEND: str = Field(
+        default=...,
+        description="CELERY RESULT BACKEND"
+    ) 
+
     @validator("DATABASE_URL", pre=True)
     def validate_database_url(cls, v):
         if os.getenv("DATABASE_URL"):
