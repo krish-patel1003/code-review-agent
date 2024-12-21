@@ -210,13 +210,3 @@ class GithubService:
             }
         except Exception as e:
             raise Exception(f"Error fetching PR statistics: {e}")
-
-
-# if __name__ == "__main__":
-
-#     repo_url = "https://github.com/krish-patel1003/RMS"
-#     client = GithubService("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")
-#     tree, file_paths = client.get_tree_strucutre_and_file_paths(repo_url=repo_url)
-#     print(file_paths)
-#     result = client.retrieve_github_repo_all_content(repo_url=repo_url)
-#     print(result)
