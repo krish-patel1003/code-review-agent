@@ -54,11 +54,10 @@ class Settings(BaseSettings):
         description="CELERY RESULT BACKEND"
     ) 
 
-    @validator("DATABASE_URL", pre=True)
-    def validate_database_url(cls, v):
-        if os.getenv("DATABASE_URL"):
-            return os.getenv("DATABASE_URL")
-        return v
+    REDIS_CLIENT_URL: str = Field(
+        default=...,
+        description="Redis client url"
+    )
 
     class Config:
         env_file = ".env"

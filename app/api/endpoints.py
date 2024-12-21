@@ -1,16 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from celery.result import AsyncResult
 from app.tasks import full_review_workflow_task
-from app.config import get_code_review_agent, get_github_service
+from app.config import get_cache_client
+from app.db import get_analysis_by_id
+from datetime import timedelta
+from app.models import AnalyzePRRequest
 
 
 router = APIRouter()
 
 @router.post("/analyze-pr")
-def analyze_pr(repo_url: str, pr_number: int):
+def analyze_pr(payload: AnalyzePRRequest):
     try:
         task = full_review_workflow_task.apply_async(
-            args=[repo_url, pr_number]
+            args=[str(payload.repo_url), payload.pr_number]
         )
         return {"task_id": task.id}
     except Exception as e:
@@ -23,12 +26,18 @@ def get_status(task_id: str):
 
 @router.get("/results/{task_id}")
 def get_results(task_id: str):
-    task_result = AsyncResult(task_id)
-    if task_result.status == "SUCCESS":
-        return {"task_id": task_id, "result": task_result.result}
-    elif task_result.status == "PENDING":
-        raise HTTPException(status_code=202, detail="Task is still in progress")
-    elif task_result.status == "FAILURE":
-        raise HTTPException(status_code=500, detail=str(task_result.result))
+
+    cache_client = get_cache_client()
+
+    cached_result = cache_client.get(task_id)
+    if cached_result:
+        return {"task_id": task_id, "result": eval(cached_result)}
+
+    # If not found in cache, fetch from database
+    print("task_id in get_results:\t", task_id)
+    analysis_result = get_analysis_by_id(task_id)
+    if analysis_result:
+        cache_client.setex(task_id, timedelta(minutes=5), str(analysis_result.result))
+        return {"task_id": task_id, "result": analysis_result.result}
     else:
-        raise HTTPException(status_code=500, detail="Unexpected task status")
+        raise HTTPException(status_code=404, detail="Task result not found")
