@@ -116,7 +116,7 @@ class GithubService:
                     filename=file.filename,
                     status=file.status,
                     additions=file.additions,
-                    deletions=file.contents_url,
+                    deletions=file.deletions,
                     changes=file.changes,
                     patch=file.patch,
                     content=content
@@ -149,13 +149,13 @@ class GithubService:
             return None
 
 
-    def get_github_repo_complete_data(self, repo_url: str) -> List[dict]:
+    def get_github_repo_complete_data(self, repo_url: str) -> Tuple[str, List[str], List[dict]]:
         directory_tree, file_paths = self.get_tree_strucutre_and_file_paths(repo_url=repo_url)
+        branch = self.get_default_branch(repo_url=repo_url)
 
         contents = []
 
         for path in file_paths:
-            branch = self.get_default_branch(repo_url=repo_url)
             file_content = self.get_file_content(repo_url=repo_url, file_path=path, ref= branch)
             filetype = ""
 

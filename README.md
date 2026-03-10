@@ -127,11 +127,12 @@ Key variables in `.env`:
 ```
 APP_ENV=development
 APP_SECRET_KEY=
-DATABASE_URL=postgresql://postgres:postgres@db:5432/code_review
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/code_review
 GITHUB_TOKEN=
 GEMINI_API_KEY=
+GEMINI_CHAT_MODEL=gemini-3.1-pro-preview
+GEMINI_EMBEDDING_MODEL=models/gemini-embedding-001
 CELERY_BROKER_URL=redis://redis:6379/0
 CELERY_RESULT_BACKEND=redis://redis:6379/0
 REDIS_CLIENT_URL=redis://redis:6379/0
 ```
-

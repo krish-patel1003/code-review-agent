@@ -1,9 +1,10 @@
 import streamlit as st
 import requests
 import pandas as pd
+import os
 
 # API Base URL (adjust if needed)
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8081")
 
 # Initialize session state for tasks
 if "tasks" not in st.session_state:

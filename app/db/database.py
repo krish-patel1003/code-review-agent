@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
 from app.config import get_settings
 
 settings = get_settings()
@@ -8,7 +7,7 @@ settings = get_settings()
 DATABASE_URL = settings.DATABASE_URL
 
 # Create synchronous engine
-engine = create_engine(str(DATABASE_URL), echo=True)
+engine = create_engine(str(DATABASE_URL), echo=False, pool_pre_ping=True)
 
 # Create synchronous sessionmaker
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

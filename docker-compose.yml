@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8081:8081"
     env_file:
       - .env
     volumes:
@@ -14,13 +14,29 @@ services:
       - redis
       - db
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: streamlit run app/streamlit.py --server.port 8501 --server.address 0.0.0.0
+    environment:
+      API_BASE_URL: http://web:8081
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+
   celery_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    command: celery -A app.tasks.analyze worker --loglevel=info
+    command: celery -A app.tasks.analyze:celery_app worker --loglevel=info
     env_file:
       - .env
+    volumes:
+      - .:/app
     depends_on:
       - redis
       - db

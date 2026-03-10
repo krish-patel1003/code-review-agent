@@ -4,23 +4,33 @@ from app.config import get_settings
 from app.services import GithubService 
 from app.services import CodeReviewAgent
 from redis import Redis
-import sys
 from redis import ConnectionError
+
+
+def _require_setting(value: Optional[str], setting_name: str) -> str:
+    if value and value.strip():
+        return value
+    raise RuntimeError(f"Missing required setting: {setting_name}")
 
 
 def get_github_service(github_token: Optional[str] = None) -> GithubService:
 
     settings = get_settings()
-    token = github_token or settings.GITHUB_TOKEN
+    token = _require_setting(github_token or settings.GITHUB_TOKEN, "GITHUB_TOKEN")
     return GithubService(token)
 
 
 def get_code_review_agent(api_key: Optional[str] = None) -> CodeReviewAgent:
 
     settings = get_settings()
-    gemini_key = settings.GEMINI_API_KEY
+    gemini_key = _require_setting(api_key or settings.GEMINI_API_KEY, "GEMINI_API_KEY")
     github_service = get_github_service()
-    return CodeReviewAgent(github_service=github_service, api_key=gemini_key)
+    return CodeReviewAgent(
+        github_service=github_service,
+        api_key=gemini_key,
+        chat_model=settings.GEMINI_CHAT_MODEL,
+        embedding_model=settings.GEMINI_EMBEDDING_MODEL,
+    )
 
 
 def get_celery_app() -> Celery:
@@ -51,10 +61,7 @@ def get_cache_client() -> Redis:
         ping = cache_client.ping()
         if ping is True:
             return cache_client
-    except ConnectionError:
-        print("Redis Connection Error!")
-        sys.exit(1)
+    except ConnectionError as exc:
+        raise RuntimeError("Redis connection error") from exc
 
-    
-    return cache_client
-
+    raise RuntimeError("Redis ping failed")

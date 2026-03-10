@@ -5,6 +5,7 @@ from app.config import get_cache_client
 from app.db import get_analysis_by_id
 from datetime import timedelta
 from app.models import AnalyzePRRequest
+import json
 
 
 router = APIRouter()
@@ -31,13 +32,15 @@ def get_results(task_id: str):
 
     cached_result = cache_client.get(task_id)
     if cached_result:
-        return {"task_id": task_id, "result": eval(cached_result)}
+        try:
+            return {"task_id": task_id, "result": json.loads(cached_result.decode("utf-8"))}
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Cached result parse error: {exc}")
 
     # If not found in cache, fetch from database
-    print("task_id in get_results:\t", task_id)
     analysis_result = get_analysis_by_id(task_id)
     if analysis_result:
-        cache_client.setex(task_id, timedelta(minutes=5), str(analysis_result.result))
+        cache_client.setex(task_id, timedelta(minutes=5), json.dumps(analysis_result.result))
         return {"task_id": task_id, "result": analysis_result.result}
     else:
         raise HTTPException(status_code=404, detail="Task result not found")

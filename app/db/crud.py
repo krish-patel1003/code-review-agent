@@ -1,4 +1,3 @@
-from sqlalchemy.exc import IntegrityError
 from app.db.database import SessionLocal
 from app.db.models import AnalysisResult
 
@@ -21,10 +20,6 @@ def save_analysis(task_id: str, repo_url: str, pr_number: int, result: dict):
 
 def get_analysis_by_id(task_id: str):
     """Fetch analysis entry by task_id."""
-    print("in get_analysis_results")
-    print("task_id in analysis func:\t", task_id)
     with SessionLocal() as session:
-        obj = session.get(AnalysisResult, task_id)
-        print("OBJ:\t", obj)
         query = session.query(AnalysisResult).filter(AnalysisResult.task_id == task_id)
         return query.first()
